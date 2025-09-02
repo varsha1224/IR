@@ -1,0 +1,41 @@
+import re
+import string
+
+# A small sample stopwords list (can expand)
+STOPWORDS = {
+    'a', 'an', 'the', 'and', 'or', 'but', 'if', 'while', 'with', 'of', 
+    'at', 'by', 'for', 'to', 'in', 'on', 'is', 'it', 'this', 'that', 'as'
+}
+
+def preprocess_docs(file_paths, remove_stopwords=True):
+    """
+    Reads text files, preprocesses text, and returns a list of cleaned documents.
+
+    Args:
+        file_paths (list): List of paths to text files.
+        remove_stopwords (bool): Whether to remove common stopwords.
+
+    Returns:
+        List of cleaned document strings.
+    """
+    docs = []
+
+    for file_path in file_paths:
+        with open(file_path, 'r', encoding='utf-8') as f:
+            text = f.read().lower()  # Lowercase
+            text = re.sub(f"[{re.escape(string.punctuation)}]", " ", text)  # Remove punctuation
+            tokens = text.split()
+            
+            if remove_stopwords:
+                tokens = [t for t in tokens if t not in STOPWORDS]
+            
+            cleaned_text = ' '.join(tokens)
+            docs.append(cleaned_text)
+    
+    return docs
+
+# --- Usage Example ---
+file_list = ['doc1.txt', 'doc2.txt', 'doc3.txt']
+documents = preprocess_docs(file_list)
+print(documents)
+print(len(documents))
