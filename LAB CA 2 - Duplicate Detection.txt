@@ -1,0 +1,444 @@
+# DUPLICATE DETECTION
+
+# (i) MinHash Implementation
+
+import random
+import numpy as np
+
+# Example documents
+docs = [
+    "the cat sat on the mat",
+    "the dog sat on the mat",
+    "the cat chased the dog"
+]
+
+# Shingling (k = 2 or 3)
+def get_shingles(doc, k=2):
+    words = doc.split()
+    return {" ".join(words[i:i+k]) for i in range(len(words)-k+1)}
+
+k = 2
+shingle_set = set()
+doc_shingles = []
+
+for d in docs:
+    sh = get_shingles(d, k)
+    doc_shingles.append(sh)
+    shingle_set |= sh
+
+shingles = list(shingle_set)
+
+print("\nShingles taken (row index -> shingle):")
+for idx, sh in enumerate(shingles):
+    print(f"{idx}: {sh}")
+
+# Build binary shingle–document matrix
+matrix = []
+for sh in shingles:
+    row = [1 if sh in doc_shingles[j] else 0 for j in range(len(docs))]
+    matrix.append(row)
+
+sd_matrix = np.array(matrix)
+
+print("\n\nShingle–Document Matrix:")
+print(sd_matrix)
+
+# MinHash Implementation
+num_shingles, num_docs = sd_matrix.shape
+num_hashes = 5  # number of permutations
+signature = np.full((num_hashes, num_docs), np.inf)
+
+rows = list(range(num_shingles))
+permutations = [random.sample(rows, len(rows)) for _ in range(num_hashes)]
+
+for i, perm in enumerate(permutations):
+    for col in range(num_docs):
+        for row in perm:
+            if sd_matrix[row, col] == 1:
+                signature[i, col] = row
+                break
+
+print("\nSignature Matrix:")
+print(signature)
+
+# Similarity from signatures
+def minhash_sim(col1, col2):
+    return np.mean(signature[:, col1] == signature[:, col2])
+
+print("\nSimilarity between Doc1 & Doc2:", minhash_sim(0, 1))
+print("Similarity between Doc1 & Doc3:", minhash_sim(0, 2))
+print("Similarity between Doc2 & Doc3:", minhash_sim(1, 2))
+
+# Jaccard similarity
+def jaccard_sim(set1, set2):
+    return len(set1 & set2) / len(set1 | set2)
+
+print("\nTrue Jaccard Similarities:")
+print("Doc1 & Doc2:", jaccard_sim(doc_shingles[0], doc_shingles[1]))
+print("Doc1 & Doc3:", jaccard_sim(doc_shingles[0], doc_shingles[2]))
+print("Doc2 & Doc3:", jaccard_sim(doc_shingles[1], doc_shingles[2]))
+
+
+def jaccard_from_matrix(col1, col2):
+    intersection = np.sum(np.logical_and(sd_matrix[:, col1], sd_matrix[:, col2]))
+    union = np.sum(np.logical_or(sd_matrix[:, col1], sd_matrix[:, col2]))
+    return intersection / union
+
+print("\nJaccard Similarities from sd_matrix:")
+print("Doc1 & Doc2:", jaccard_from_matrix(0, 1))
+print("Doc1 & Doc3:", jaccard_from_matrix(0, 2))
+print("Doc2 & Doc3:", jaccard_from_matrix(1, 2))
+
+
+
+
+# (ii) MinHash (Binary Matrix) - Hash Functions
+
+import random
+import numpy as np
+
+# Example documents
+docs = [
+    "the cat sat on the mat",
+    "the dog sat on the mat",
+    "the cat chased the dog"
+]
+
+# Shingling
+def get_shingles(doc, k=2):
+    words = doc.split()
+    return {" ".join(words[i:i+k]) for i in range(len(words)-k+1)}
+
+k = 2
+shingle_set = set()
+doc_shingles = []
+
+for d in docs:
+    sh = get_shingles(d, k)
+    doc_shingles.append(sh)
+    shingle_set |= sh
+
+shingles = list(shingle_set)
+
+# Build binary shingle–document matrix
+matrix = []
+for sh in shingles:
+    row = [1 if sh in doc_shingles[j] else 0 for j in range(len(docs))]
+    matrix.append(row)
+
+sd_matrix = np.array(matrix)
+num_shingles, num_docs = sd_matrix.shape
+
+print("Shingle–Document Matrix:")
+print(sd_matrix)
+
+# MinHash with multiple hash functions
+num_hashes = 10
+#p = 2**31 - 1   # large prime
+p = 11
+
+# Random hash function coefficients (a, b)
+hash_funcs = [(random.randint(1, p-1), random.randint(0, p-1)) for _ in range(num_hashes)]
+
+# Initialize signature matrix with infinity
+signature = np.full((num_hashes, num_docs), np.inf)
+
+# Compute MinHash signatures
+for i, (a, b) in enumerate(hash_funcs):
+    for row in range(num_shingles):
+        hash_val = (a * row + b) % p
+        for col in range(num_docs):
+            if sd_matrix[row, col] == 1:
+                if hash_val < signature[i, col]:
+                    signature[i, col] = hash_val
+
+print("\nSignature Matrix:")
+print(signature.astype(int))  # cast to int for readability
+
+# MinHash similarity
+def minhash_sim(col1, col2):
+    return np.mean(signature[:, col1] == signature[:, col2])
+
+print("\nMinHash Similarities (approx):")
+print("Doc1 & Doc2:", minhash_sim(0, 1))
+print("Doc1 & Doc3:", minhash_sim(0, 2))
+print("Doc2 & Doc3:", minhash_sim(1, 2))
+
+# Jaccard similarity
+def jaccard_sim(set1, set2):
+    return len(set1 & set2) / len(set1 | set2)
+
+print("\nTrue Jaccard Similarities:")
+print("Doc1 & Doc2:", jaccard_sim(doc_shingles[0], doc_shingles[1]))
+print("Doc1 & Doc3:", jaccard_sim(doc_shingles[0], doc_shingles[2]))
+print("Doc2 & Doc3:", jaccard_sim(doc_shingles[1], doc_shingles[2]))
+
+
+
+
+# (iii) MinHash (Binary Matrix) - When hash function is given
+
+import numpy as np
+
+# Example documents
+docs = [
+    "the cat sat on the mat",
+    "the dog sat on the mat",
+    "the cat chased the dog"
+]
+
+# Shingling
+def get_shingles(doc, k=2):
+    words = doc.split()
+    return {" ".join(words[i:i+k]) for i in range(len(words)-k+1)}
+
+k = 2
+shingle_set = set()
+doc_shingles = []
+
+for d in docs:
+    sh = get_shingles(d, k)
+    doc_shingles.append(sh)
+    shingle_set |= sh
+
+shingles = list(shingle_set)
+
+# Build binary shingle–document matrix
+matrix = []
+for sh in shingles:
+    row = [1 if sh in doc_shingles[j] else 0 for j in range(len(docs))]
+    matrix.append(row)
+
+sd_matrix = np.array(matrix)
+num_shingles, num_docs = sd_matrix.shape
+
+print("Shingle–Document Matrix:")
+print(sd_matrix)
+
+# MinHash with provided hash functions
+num_hashes = 5
+p = 11  # prime number for hash modulus
+
+# Provided hash functions coefficients (a,b)
+hash_funcs = [
+    (1, 0),
+    (2, 1),
+    (3, 2),
+    (4, 3),
+    (5, 4)
+]
+
+signature = np.full((num_hashes, num_docs), np.inf)
+
+for i, (a, b) in enumerate(hash_funcs):
+    for row in range(num_shingles):
+        hash_val = (a * row + b) % p
+        for col in range(num_docs):
+            if sd_matrix[row, col] == 1:
+                if hash_val < signature[i, col]:
+                    signature[i, col] = hash_val
+
+print("\nSignature Matrix:")
+print(signature.astype(int))
+
+# MinHash similarity
+def minhash_sim(col1, col2):
+    return np.mean(signature[:, col1] == signature[:, col2])
+
+print("\nMinHash Similarities (approx):")
+print("Doc1 & Doc2:", minhash_sim(0, 1))
+print("Doc1 & Doc3:", minhash_sim(0, 2))
+print("Doc2 & Doc3:", minhash_sim(1, 2))
+
+# True Jaccard similarity
+def jaccard_sim(set1, set2):
+    return len(set1 & set2) / len(set1 | set2)
+
+print("\nTrue Jaccard Similarities:")
+print("Doc1 & Doc2:", jaccard_sim(doc_shingles[0], doc_shingles[1]))
+print("Doc1 & Doc3:", jaccard_sim(doc_shingles[0], doc_shingles[2]))
+print("Doc2 & Doc3:", jaccard_sim(doc_shingles[1], doc_shingles[2]))
+
+
+
+# (iv) Cosine and Euclidean Similarity
+
+import numpy as np
+from numpy.linalg import norm
+
+# Example documents
+docs = [
+    "this is a cat",
+    "this is a dog",
+    "cats and dogs are animals",
+    "the dog chased the cat"
+]
+
+# Vocabulary
+words = list(set(" ".join(docs).split()))
+
+# Term Frequency (TF)
+tf = []
+for d in docs:
+    row = [d.split().count(w) for w in words]
+    tf.append(row)
+tf = np.array(tf)
+
+# Inverse Document Frequency (IDF)
+N = len(docs)
+idf = np.log(N / (np.count_nonzero(tf, axis=0)))
+
+# TF-IDF
+tfidf = tf * idf
+print("TF-IDF Matrix:\n", tfidf)
+
+# Pairwise Cosine Similarity and Euclidean Distance
+num_docs = len(docs)
+
+print("\nCosine Similarities:")
+for i in range(num_docs):
+    for j in range(i+1, num_docs):
+        cosine_sim = np.dot(tfidf[i], tfidf[j]) / (norm(tfidf[i]) * norm(tfidf[j]))
+        print(f"Doc{i+1} vs Doc{j+1}: {cosine_sim:.4f}")
+
+print("\nEuclidean Distances:")
+for i in range(num_docs):
+    for j in range(i+1, num_docs):
+        euclidean_dist = norm(tfidf[i] - tfidf[j])
+        print(f"Doc{i+1} vs Doc{j+1}: {euclidean_dist:.4f}")
+
+
+
+
+# (v) MinHash using TF-IDF, Cosine and Euclidean Similarity
+
+import numpy as np
+from numpy.linalg import norm
+
+# Example documents
+docs = [
+    "this is a cat",
+    "this is a dog",
+    "cats and dogs are animals",
+    "the dog chased the cat"
+]
+
+# Vocabulary
+words = list(set(" ".join(docs).split()))
+
+# Term Frequency (TF)
+tf = []
+for d in docs:
+    row = [d.split().count(w) for w in words]
+    tf.append(row)
+tf = np.array(tf)
+
+# Inverse Document Frequency (IDF)
+N = len(docs)
+idf = np.log(N / (np.count_nonzero(tf, axis=0)))
+
+# TF-IDF
+tfidf = tf * idf
+print("TF-IDF Matrix:\n", tfidf)
+
+# MinHash on TF-IDF vectors
+num_hashes = 5
+p = 11  # prime for hash modulus
+
+# Provided hash functions (a,b)
+hash_funcs = [
+    (1, 0),
+    (2, 1),
+    (3, 2),
+    (4, 3),
+    (5, 4)
+]
+
+num_docs, num_terms = tfidf.shape
+signature = np.full((num_hashes, num_docs), np.inf)
+
+for i, (a, b) in enumerate(hash_funcs):
+    for row in range(num_terms):
+        hash_val = (a * row + b) % p
+        for col in range(num_docs):
+            if tfidf[col, row] > 0:
+                weighted_hash = hash_val / tfidf[col, row]
+                if weighted_hash < signature[i, col]:
+                    signature[i, col] = weighted_hash
+
+
+print("\nSignature Matrix (TF-IDF weighted):")
+print(signature.astype(int))
+
+# MinHash Similarities
+
+def minhash_sim(col1, col2):
+    return np.mean(signature[:, col1] == signature[:, col2])
+
+print("\nMinHash Similarities:")
+print("Doc1 & Doc2:", minhash_sim(0, 1))
+print("Doc1 & Doc3:", minhash_sim(0, 2))
+print("Doc2 & Doc3:", minhash_sim(1, 2))
+
+# Pairwise Cosine Similarity and Euclidean Distance
+num_docs = len(docs)
+
+print("\nCosine Similarities:")
+for i in range(num_docs):
+    for j in range(i+1, num_docs):
+        cosine_sim = np.dot(tfidf[i], tfidf[j]) / (norm(tfidf[i]) * norm(tfidf[j]))
+        print(f"Doc{i+1} vs Doc{j+1}: {cosine_sim:.4f}")
+
+print("\nEuclidean Distances:")
+for i in range(num_docs):
+    for j in range(i+1, num_docs):
+        euclidean_dist = norm(tfidf[i] - tfidf[j])
+        print(f"Doc{i+1} vs Doc{j+1}: {euclidean_dist:.4f}")
+
+
+
+
+
+# (vi) PREPROCESSING
+
+import re
+import string
+
+# A small sample stopwords list (can expand)
+STOPWORDS = {
+    'a', 'an', 'the', 'and', 'or', 'but', 'if', 'while', 'with', 'of',
+    'at', 'by', 'for', 'to', 'in', 'on', 'is', 'it', 'this', 'that', 'as'
+}
+
+def preprocess_docs(file_paths, remove_stopwords=True):
+    """
+    Reads text files, preprocesses text, and returns a list of cleaned documents.
+
+    Args:
+        file_paths (list): List of paths to text files.
+        remove_stopwords (bool): Whether to remove common stopwords.
+
+    Returns:
+        List of cleaned document strings.
+    """
+    docs = []
+
+    for file_path in file_paths:
+        with open(file_path, 'r') as f:
+            text = f.read().lower()  # Lowercase
+            text = re.sub(f"[{re.escape(string.punctuation)}]", " ", text)  # Remove punctuation
+            tokens = text.split()
+
+            if remove_stopwords:
+                tokens = [t for t in tokens if t not in STOPWORDS]
+
+            cleaned_text = ' '.join(tokens)
+            docs.append(cleaned_text)
+
+    return docs
+
+# --- Usage Example ---
+file_list = ['doc1.txt', 'doc2.txt', 'doc3.txt']
+documents = preprocess_docs(file_list)
+print(documents)
+print(len(documents))
