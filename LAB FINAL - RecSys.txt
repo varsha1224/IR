@@ -1,0 +1,80 @@
+# RECOMMENDATION SYSTEM - COLLABORATIVE (USER, ITEM-BASED)
+
+import numpy as np
+
+# ===========================
+# Cosine similarity
+# ===========================
+def cosine_similarity(v1, v2):
+    mask = (~np.isnan(v1)) & (~np.isnan(v2))
+    if np.sum(mask) == 0:
+        return 0
+    v1, v2 = v1[mask], v2[mask]
+    num = np.dot(v1, v2)
+    denom = np.linalg.norm(v1) * np.linalg.norm(v2)
+    return num / denom if denom != 0 else 0
+
+
+# ===========================
+# Collaborative Filtering prediction
+# ===========================
+def predict_rating(matrix, target_user, target_item, method='user', k=None):
+    """
+    Predict rating for a user-item pair using CF (user-based or item-based)
+    """
+    matrix = np.array(matrix, dtype=float)
+    sims = []
+
+    if method == 'user':
+        # Compare target user with all other users
+        for u in range(matrix.shape[0]):
+            if u == target_user or np.isnan(matrix[u, target_item]):
+                continue
+            sim = cosine_similarity(matrix[target_user, :], matrix[u, :])
+            if sim > 0:
+                sims.append((sim, matrix[u, target_item]))
+
+    elif method == 'item':
+        # Compare target item with all other items
+        for i in range(matrix.shape[1]):
+            if i == target_item or np.isnan(matrix[target_user, i]):
+                continue
+            sim = cosine_similarity(matrix[:, target_item], matrix[:, i])
+            if sim > 0:
+                sims.append((sim, matrix[target_user, i]))
+
+    # Sort by similarity (descending)
+    sims.sort(reverse=True, key=lambda x: x[0])
+    if k is not None:
+        sims = sims[:k]
+
+    if len(sims) == 0:
+        return np.nan
+
+    sims, ratings = zip(*sims)
+    return np.dot(sims, ratings) / np.sum(sims)
+
+
+# ===========================
+# Example matrix (users × items)
+# ===========================
+ratings = np.array([
+    [5, 4, np.nan, 2, 1, 4],
+    [1, 2, 2, np.nan, np.nan, 4],
+    [3, np.nan, 2, 4, 2, 1],
+    [2, 5, 4, np.nan, 2, 3],
+    [np.nan, 4, 3, 5, 2, 1],
+    [1, 2, 1, 2, np.nan, 3]
+], dtype=float)
+
+
+# ===========================
+# Predictions
+# ===========================
+# User-based CF
+pred_user = predict_rating(ratings, target_user=2, target_item=2, method='user', k=3)
+print(f"User-based CF prediction (u3 on i3): {pred_user:.2f}")
+
+# Item-based CF
+pred_item = predict_rating(ratings, target_user=2, target_item=2, method='item', k=3)
+print(f"Item-based CF prediction (u3 on i3): {pred_item:.2f}")

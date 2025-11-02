@@ -1,0 +1,136 @@
+# KMEANS
+
+# QUESTION 1: TFIDF
+import numpy as np
+import math
+
+docs = [
+    "apple launches new iphone with advanced camera",
+    "samsung unveils latest galaxy smartphone",
+    "microsoft introduces new ai features in office",
+    "google announces ai powered search tools",
+    "apple and samsung continue smartphone rivalry"
+]
+
+# Step 1: Tokenize
+tokenized_docs = [doc.split() for doc in docs]
+
+# Step 2: Build vocabulary
+vocab = sorted(list(set([word for doc in tokenized_docs for word in doc])))
+
+# Step 3: Compute term frequency (TF)
+def compute_tf(doc_tokens):
+    tf = {}
+    for word in vocab:
+        tf[word] = doc_tokens.count(word) / len(doc_tokens)
+    return tf
+
+tf_list = [compute_tf(doc) for doc in tokenized_docs]
+
+# Step 4: Compute inverse document frequency (IDF)
+def compute_idf():
+    N = len(tokenized_docs)
+    idf = {}
+    for word in vocab:
+        df = sum([1 for doc in tokenized_docs if word in doc])
+        idf[word] = math.log((N) / (1 + df)) + 1  # smooth
+    return idf
+
+idf = compute_idf()
+
+# Step 5: Compute TF-IDF
+tfidf = []
+for tf in tf_list:
+    tfidf_vec = [tf[word] * idf[word] for word in vocab]
+    tfidf.append(tfidf_vec)
+
+tfidf = np.array(tfidf)
+print("TF-IDF Matrix shape:", tfidf.shape)
+
+def kmeans(X, k=2, max_iter=100):
+    # Randomly initialize centroids
+    np.random.seed(42)
+    indices = np.random.choice(len(X), k, replace=False)
+    centroids = X[indices]
+
+    for _ in range(max_iter):
+        # Assign clusters
+        distances = np.linalg.norm(X[:, None] - centroids, axis=2)
+        labels = np.argmin(distances, axis=1)
+
+        # Update centroids
+        new_centroids = np.array([X[labels == i].mean(axis=0) for i in range(k)])
+
+        # Stop if centroids don't change
+        if np.allclose(centroids, new_centroids):
+            break
+        centroids = new_centroids
+
+    return labels, centroids
+
+labels, centroids = kmeans(tfidf, k=2)
+for i, (doc, label) in enumerate(zip(docs, labels)):
+    print(f"Cluster {label}: {doc}")
+
+
+# QUESTION 2: EUCLIDEAN DISTANCE
+# clustering classification
+import random
+import math
+
+# movie = [action, comedy]
+movies = {
+    "Die Hard":     [9, 1],
+    "Terminator":   [10, 0],
+    "The Hangover": [2, 9],
+    "Superbad":     [1, 10],
+    "Matrix":       [8, 2],
+    "Rush Hour":    [7, 8],
+    "Bridesmaids":  [1, 9],
+    "Avengers":     [9, 3],
+    "Step Brothers":[2, 10],
+    "Iron Man":     [8, 2]
+}
+
+data = list(movies.values())
+names = list(movies.keys())
+
+# Distance between two points
+def dist(a, b):
+    return math.sqrt((a[0]-b[0])**2 + (a[1]-b[1])**2)
+
+# K-Means from scratch
+K = 3
+random.seed(42)
+centroids = [data[i] for i in random.sample(range(len(data)), K)]
+
+for _ in range(20):  # max 20 iterations
+    clusters = [[] for _ in range(K)]
+    labels = [-1] * len(data)
+
+    # Assign each point to closest centroid
+    for i, point in enumerate(data):
+        distances = [dist(point, c) for c in centroids]
+        cluster_id = distances.index(min(distances))
+        clusters[cluster_id].append(i)
+        labels[i] = cluster_id
+
+    # Update centroids
+    new_centroids = []
+    for cluster in clusters:
+        if not cluster:
+            new_centroids.append(centroids[clusters.index(cluster)])
+            continue
+        sum_x = sum_y = 0
+        for idx in cluster:
+            sum_x += data[idx][0]
+            sum_y += data[idx][1]
+        new_centroids.append([sum_x/len(cluster), sum_y/len(cluster)])
+    centroids = new_centroids
+
+# PRINT RESULT
+print("=== MOVIE CLUSTERS (K-Means) ===")
+for i in range(K):
+    print(f"\nCluster {i}:")
+    for idx in clusters[i]:
+        print(f"  - {names[idx]}")

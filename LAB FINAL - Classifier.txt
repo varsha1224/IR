@@ -1,0 +1,393 @@
+# CLASSIFIER
+
+# QUESTION 1: ROCCHIO
+
+# Rocchio Classification
+
+# ========================================
+# 1. HARD-CODED TRAINING DATA
+# ========================================
+training_data = [
+    ("love movie great", 1),
+    ("best film ever", 1),
+    ("awesome acting", 1),
+    ("funny exciting", 1),
+    ("recommend watch", 1),
+    ("waste time", 0),
+    ("boring slow", 0),
+    ("hate movie", 0),
+    ("bad plot", 0),
+    ("not worth", 0)
+]
+
+test_reviews = [
+    "love best movie",
+    "boring waste time",
+    "funny and great",
+    "bad not recommend"
+]
+
+# ========================================
+# 2. BUILD VOCABULARY
+# ========================================
+vocab = set()
+for text, _ in training_data:
+    for word in text.split():
+        vocab.add(word)
+vocab = sorted(list(vocab))
+V = len(vocab)
+print(f"Vocabulary: {vocab}\n")
+
+# ========================================
+# 3. BINARY VECTOR (1 if word present)
+# ========================================
+def to_vector(text):
+    words = text.split()
+    return [1 if word in words else 0 for word in vocab]
+
+# ========================================
+# 4. ROCCHIO: Build class prototypes
+# ========================================
+alpha, beta = 1.0, 0.5
+pos_docs = [to_vector(t) for t, l in training_data if l == 1]
+neg_docs = [to_vector(t) for t, l in training_data if l == 0]
+
+N_pos, N_neg = len(pos_docs), len(neg_docs)
+
+# Average positive vector
+pos_avg = [0.0] * V
+for vec in pos_docs:
+    for i in range(V):
+        pos_avg[i] += vec[i]
+pos_avg = [alpha * (x / N_pos) for x in pos_avg]
+
+# Average negative vector
+neg_avg = [0.0] * V
+for vec in neg_docs:
+    for i in range(V):
+        neg_avg[i] += vec[i]
+neg_avg = [beta * (x / N_neg) for x in neg_avg]
+
+# Final prototypes
+proto_pos = [pos_avg[i] - neg_avg[i] for i in range(V)]
+proto_neg = [neg_avg[i] - pos_avg[i] for i in range(V)]
+
+# ========================================
+# 5. COSINE SIMILARITY
+# ========================================
+def dot(a, b):
+    return sum(a[i] * b[i] for i in range(len(a)))
+
+def norm(v):
+    return (sum(x*x for x in v)) ** 0.5
+
+def cosine(a, b):
+    na, nb = norm(a), norm(b)
+    return 0.0 if na == 0 or nb == 0 else dot(a, b) / (na * nb)
+
+# ========================================
+# 6. CLASSIFY
+# ========================================
+def rocchio_classify(text):
+    vec = to_vector(text)
+    return 1 if cosine(vec, proto_pos) > cosine(vec, proto_neg) else 0
+
+# ========================================
+# 7. RUN
+# ========================================
+print("=== ROCCHIO CLASSIFICATION ===")
+for r in test_reviews:
+    pred = rocchio_classify(r)
+    print(f'"{r}" -> {"POSITIVE" if pred == 1 else "NEGATIVE"}')
+
+# QUESTION 2: MULTINOMIAL NB
+# Multinomial Naive Bayes
+
+# ========================================
+# 1. HARD-CODED TRAINING DATA
+# ========================================
+# Format: (review_text, label)  -> 1 = Positive, 0 = Negative
+training_data = [
+    ("love this movie great", 1),
+    ("best film ever seen", 1),
+    ("awesome acting amazing", 1),
+    ("funny and exciting", 1),
+    ("highly recommend it", 1),
+
+    ("waste of time", 0),
+    ("boring and slow", 0),
+    ("hate this movie", 0),
+    ("terrible plot bad", 0),
+    ("not worth watching", 0)
+]
+
+# ========================================
+# 2. TEST REVIEWS (to classify)
+# ========================================
+test_reviews = [
+    "love it best ever",
+    "boring waste time",
+    "amazing and funny",
+    "bad not recommend"
+]
+
+# ========================================
+# 3. BUILD VOCABULARY (all unique words)
+# ========================================
+vocab = set()
+for text, _ in training_data:
+    for word in text.split():
+        vocab.add(word)
+vocab = list(vocab)
+print(f"Vocabulary ({len(vocab)} words): {vocab}\n")
+
+# ========================================
+# 4. COUNT WORDS PER CLASS
+# ========================================
+pos_words = []  # list of words in positive reviews
+neg_words = []  # list of words in negative reviews
+
+pos_count = 0
+neg_count = 0
+total_docs = len(training_data)
+
+for text, label in training_data:
+    words = text.split()
+    if label == 1:
+        pos_words.extend(words)
+        pos_count += 1
+    else:
+        neg_words.extend(words)
+        neg_count += 1
+
+# Prior probabilities
+prior_pos = pos_count / total_docs
+prior_neg = neg_count / total_docs
+
+print(f"Positive docs: {pos_count}, Negative docs: {neg_count}")
+print(f"P(Positive) = {prior_pos:.3f}, P(Negative) = {prior_neg:.3f}\n")
+
+# ========================================
+# 5. WORD COUNTS PER CLASS
+# ========================================
+def count_in_class(word, word_list):
+    return sum(1 for w in word_list if w == word)
+
+# Total words in each class
+total_pos_words = len(pos_words)
+total_neg_words = len(neg_words)
+
+# Laplace smoothing (alpha = 1)
+alpha = 1
+vocab_size = len(vocab)
+
+# ========================================
+# 6. LIKELIHOOD: P(word | class)
+# ========================================
+def likelihood(word, class_words, total_words_in_class):
+    count = count_in_class(word, class_words)
+    return (count + alpha) / (total_words_in_class + alpha * vocab_size)
+
+# ========================================
+# 7. PREDICT FUNCTION
+# ========================================
+def predict(review):
+    words = review.split()
+
+    # Start with log prior to avoid underflow
+    log_prob_pos = 0.0
+    log_prob_neg = 0.0
+
+    for word in words:
+        if word in vocab:
+            log_prob_pos += math.log(likelihood(word, pos_words, total_pos_words))
+            log_prob_neg += math.log(likelihood(word, neg_words, total_neg_words))
+
+    # Add log prior
+    log_prob_pos += math.log(prior_pos)
+    log_prob_neg += math.log(prior_neg)
+
+    return 1 if log_prob_pos > log_prob_neg else 0
+
+# ========================================
+# 8. RUN PREDICTIONS
+# ========================================
+import math  # only for log
+
+print("=== PREDICTIONS ===")
+for review in test_reviews:
+    pred = predict(review)
+    label = "POSITIVE" if pred == 1 else "NEGATIVE"
+    print(f'"{review}" -> {label}')
+
+
+
+# QUESTION 3: MUTIVARIATE/BINOMIAL NB
+# Multivariate Bernoulli Naive Bayes 
+
+# ========================================
+# 1. HARD-CODED TRAINING DATA
+# ========================================
+training_data = [
+    ("love movie great", 1),
+    ("best film ever", 1),
+    ("awesome acting", 1),
+    ("funny exciting", 1),
+    ("recommend watch", 1),
+    ("waste time", 0),
+    ("boring slow", 0),
+    ("hate movie", 0),
+    ("bad plot", 0),
+    ("not worth", 0)
+]
+
+test_reviews = [
+    "love best movie",
+    "boring waste time",
+    "funny and great",
+    "bad not recommend"
+]
+
+# ========================================
+# 2. VOCABULARY
+# ========================================
+vocab = set()
+for text, _ in training_data:
+    for w in text.split():
+        vocab.add(w)
+vocab = sorted(list(vocab))
+V = len(vocab)
+print(f"Vocabulary: {vocab}\n")
+
+# ========================================
+# 3. BINARY VECTOR
+# ========================================
+def to_bernoulli(text):
+    words = text.split()
+    return [1 if w in words else 0 for w in vocab]
+
+# ========================================
+# 4. COUNT DOCS PER CLASS
+# ========================================
+pos_docs = [to_bernoulli(t) for t, l in training_data if l == 1]
+neg_docs = [to_bernoulli(t) for t, l in training_data if l == 0]
+N_pos, N_neg = len(pos_docs), len(neg_docs)
+N_total = N_pos + N_neg
+
+prior_pos = N_pos / N_total
+prior_neg = N_neg / N_total
+
+# ========================================
+# 5. P(word | class) with Laplace smoothing
+# ========================================
+alpha = 1.0
+p_word_pos = [0.0] * V
+p_word_neg = [0.0] * V
+
+for i in range(V):
+    count_pos = sum(doc[i] for doc in pos_docs)
+    count_neg = sum(doc[i] for doc in neg_docs)
+    p_word_pos[i] = (count_pos + alpha) / (N_pos + 2 * alpha)
+    p_word_neg[i] = (count_neg + alpha) / (N_neg + 2 * alpha)
+
+# ========================================
+# 6. CLASSIFY (log probabilities)
+# ========================================
+import math
+
+def bernoulli_nb_classify(text):
+    vec = to_bernoulli(text)
+    log_pos = math.log(prior_pos)
+    log_neg = math.log(prior_neg)
+
+    for i in range(V):
+        if vec[i] == 1:
+            log_pos += math.log(p_word_pos[i])
+            log_neg += math.log(p_word_neg[i])
+        else:
+            log_pos += math.log(1 - p_word_pos[i])
+            log_neg += math.log(1 - p_word_neg[i])
+
+    return 1 if log_pos > log_neg else 0
+
+# ========================================
+# 7. RUN
+# ========================================
+print("=== BERNOULLI NAIVE BAYES ===")
+for r in test_reviews:
+    pred = bernoulli_nb_classify(r)
+    print(f'"{r}" -> {"POSITIVE" if pred == 1 else "NEGATIVE"}')
+
+
+
+# QUESTION 4: KNN
+# k-Nearest Neighbors Classifier
+
+# ========================================
+# 1. HARD-CODED TRAINING DATA
+# Each sample: [feature1, feature2], label (0 or 1)
+# Example: movie ratings -> predict if user will like it
+# ========================================
+training_data = [
+    ([4.5, 5.0], 1),  # high action, high comedy -> likes
+    ([4.0, 4.8], 1),
+    ([3.8, 4.5], 1),
+    ([2.0, 1.5], 0),  # low action, low comedy -> dislikes
+    ([1.8, 2.0], 0),
+    ([2.2, 1.7], 0),
+    ([4.7, 3.0], 1),
+    ([1.5, 4.0], 0),
+    ([4.2, 4.0], 1),
+    ([2.5, 2.0], 0)
+]
+
+# ========================================
+# 2. TEST SAMPLES
+# ========================================
+test_samples = [
+    [4.3, 4.7],  # should be 1 (like)
+    [2.0, 1.8],  # should be 0 (dislike)
+    [3.0, 3.5],
+    [4.8, 2.5]
+]
+
+# ========================================
+# 3. EUCLIDEAN DISTANCE (from scratch)
+# ========================================
+def distance(p1, p2):
+    return ((p1[0] - p2[0])**2 + (p1[1] - p2[1])**2) ** 0.5
+
+# ========================================
+# 4. k-NN CLASSIFIER FUNCTION
+# k = number of neighbors
+# ========================================
+def knn_classify(sample, k=3):
+    # Step 1: Compute distance to all training points
+    distances = []
+    for point, label in training_data:
+        dist = distance(sample, point)
+        distances.append((dist, label))
+
+    # Step 2: Sort by distance
+    distances.sort(key=lambda x: x[0])
+
+    # Step 3: Take top k neighbors
+    neighbors = distances[:k]
+
+    # Step 4: Majority vote
+    vote_pos = sum(1 for _, label in neighbors if label == 1)
+    vote_neg = k - vote_pos
+
+    return 1 if vote_pos > vote_neg else 0
+
+# ========================================
+# 5. RUN PREDICTIONS
+# ========================================
+k_value = 3
+print(f"=== k-NN CLASSIFICATION (k={k_value}) ===")
+print("Format: [action, comedy] -> prediction\n")
+
+for i, sample in enumerate(test_samples):
+    pred = knn_classify(sample, k=k_value)
+    label = "LIKE" if pred == 1 else "DISLIKE"
+    print(f"Sample {i+1}: {sample} -> {label}")
